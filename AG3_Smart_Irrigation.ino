@@ -27,7 +27,6 @@ const int SOIL_PINS[3]  = {34, 35, 32};
 
 #define TRIG_CLEAN 14
 #define ECHO_CLEAN 22
-#define PUMP_CLEAN 19 
 
 #define TRIG_RAIN  5
 #define ECHO_RAIN  18
@@ -41,7 +40,7 @@ const int DRY_THRESHOLDS[3] = {30, 30, 30};
 const int TANK_EMPTY_THRESHOLD = 6; // cm (Big distance = Empty)
 const int TANK_FULL_THRESHOLD  = 3;  // cm (Small distance = Full)
 
-const unsigned long PUMP_DURATION = 1000;   // 5 Seconds Pumping
+const unsigned long PUMP_DURATION = 1000;   // 1 Second Pumping (Testing Mode)
 const unsigned long SOAK_COOLDOWN = 5000;   // 5 Seconds Wait (Testing Mode)
 
 // --- 4. GLOBAL VARIABLES ---
@@ -109,7 +108,24 @@ int readUltrasonic(int trig, int echo) {
   return distance;
 }
 
-// B. Send Telegram Message (DEBUG VERSION)
+// B. URL-encode text so characters like + & # % reach Telegram unchanged
+String urlEncode(const String &text) {
+  const char *hex = "0123456789ABCDEF";
+  String encoded = "";
+  for (unsigned int i = 0; i < text.length(); i++) {
+    char c = text.charAt(i);
+    if (isalnum((unsigned char)c) || c == '-' || c == '_' || c == '.' || c == '~') {
+      encoded += c;
+    } else {
+      encoded += '%';
+      encoded += hex[((unsigned char)c) >> 4];
+      encoded += hex[((unsigned char)c) & 0x0F];
+    }
+  }
+  return encoded;
+}
+
+// C. Send Telegram Message (DEBUG VERSION)
 void sendTelegram(String text) {
   if (WiFi.status() == WL_CONNECTED) {
     WiFiClientSecure client;
@@ -117,7 +133,7 @@ void sendTelegram(String text) {
     HTTPClient https;
     
     // Create the URL
-    String url = "YOUR_TELEGRAM_API_URL" + BOT_TOKEN + "/sendMessage?chat_id=" + CHAT_ID + "&text=" + text;
+    String url = "YOUR_TELEGRAM_API_URL" + BOT_TOKEN + "/sendMessage?chat_id=" + CHAT_ID + "&text=" + urlEncode(text);
     
     // Send Request
     if (https.begin(client, url)) {
@@ -293,7 +309,6 @@ void setup() {
   
   pinMode(TRIG_CLEAN, OUTPUT); pinMode(ECHO_CLEAN, INPUT);
   pinMode(TRIG_RAIN, OUTPUT);  pinMode(ECHO_RAIN, INPUT);
-  pinMode(PUMP_CLEAN, OUTPUT); digitalWrite(PUMP_CLEAN, HIGH);
   pinMode(PUMP_RAIN, OUTPUT);  digitalWrite(PUMP_RAIN, HIGH);
 
   for (int i = 0; i < 3; i++) {

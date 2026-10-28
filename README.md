@@ -184,7 +184,6 @@ From the code, which is what runs on the board:
 | Ultrasonic, rain tank (trig / echo) | GPIO 5 / 18 |
 | Ultrasonic, clean tank (trig / echo) | GPIO 14 / 22 |
 | Rain pump relay | GPIO 21 |
-| Clean pump relay | GPIO 19 (set up, not used by the logic) |
 | DHT11 | GPIO 15 |
 
 The relay board is **active low**: `LOW` turns a pump on, `HIGH` turns it off. Every pump is set
@@ -226,6 +225,18 @@ The Telegram log above comes from the finished prototype: the startup message, r
 and clean-tank-empty alerts, a forecast update, successful waterings on pots 1 and 3, and one
 "pump ran but soil is dry" warning on pot 1, which is the leak check doing its job.
 
+### Fixed after a code review
+
+A later read through the code found three problems, fixed in this repo:
+
+| Problem | Evidence | Fix |
+|---|---|---|
+| Telegram text was not URL-encoded | The log shows "( 29%)" where the code sends "(+ 29%)": the `+` arrived as a space. A `&` or `#` would have cut the message short | `urlEncode()` encodes the message before it goes into the URL. Checked on a PC: "(+ 29%)" encodes and decodes back unchanged |
+| `PUMP_DURATION` comment said 5 seconds, the value is 1 second | `PUMP_DURATION = 1000; // 5 Seconds Pumping` | Comment now says 1 second, the value the prototype was tested with |
+| A clean-tank pump on GPIO 19 was set up but never used | The 4-channel relay drives the three pot pumps and the rain pump only, and nothing in the logic switched GPIO 19 | Removed the unused pin |
+
+These changes have not been flashed to the board again since the showcase.
+
 ## Run it
 
 1. Install the [Arduino IDE](https://www.arduino.cc/en/software) and the **esp32** board package
@@ -251,20 +262,17 @@ Do not commit the file after filling in your tokens.
 
 ## Bill of materials
 
-| Item | Qty | Unit (RM) |
-|---|---|---|
-| ESP32 DevKit V1 (30-pin) | 1 | 26.30 |
-| HC-SR04 ultrasonic sensor | 2 | 3.30 |
-| DHT11 temperature and humidity sensor | 1 | 4.90 |
-| Capacitive soil moisture sensor v1.2 | 3 | 5.20 |
-| 4-channel 5 V relay module | 1 | 13.00 |
-| 5 V mini water pump | 4 | |
-| 16x2 LCD with I2C (bench test) | 1 | 15.00 |
-| Jumper wires, breadboards, clear PVC hose | | |
-| DC power supply, enclosure, plywood base, cardboard | | |
-
-The electronics that do the sensing and control cost under RM100. Prices are from the project
-report (2026).
+| Item | Qty |
+|---|---|
+| ESP32 DevKit V1 (30-pin) | 1 |
+| HC-SR04 ultrasonic sensor | 2 |
+| DHT11 temperature and humidity sensor | 1 |
+| Capacitive soil moisture sensor v1.2 | 3 |
+| 4-channel 5 V relay module | 1 |
+| 5 V mini water pump | 4 |
+| 16x2 LCD with I2C (bench test) | 1 |
+| Jumper wires, breadboards, clear PVC hose | |
+| DC power supply, enclosure, plywood base, cardboard | |
 
 ## Project structure
 
@@ -276,22 +284,19 @@ docs/images/               pictures used in this README
 
 ## Limitations
 
-- **Short watering bursts.** `PUMP_DURATION` is 1 second (its comment says 5) and the soak time
+- **Short watering bursts.** `PUMP_DURATION` is 1 second and the soak time
   is 5 seconds, values chosen for demos. A real garden needs longer bursts and minutes of soak
   time.
 - **The leak check can raise false alarms.** It compares the soil reading at the end of the
   1-second burst with the reading before it. Soil sensors react more slowly than that, so a pot
   that was watered correctly can still be reported as "soil didn't get wet".
-- **Telegram text is not URL-encoded.** Messages are put into the URL as they are, so a `+`
-  turns into a space (the log shows "( 29%)" where the code sends "(+ 29%)"), and characters
-  such as `&` or `#` would cut a message short.
 - **Soil sensors are not calibrated.** The 0 to 100% scale is a straight line over the raw ADC
   range, not fitted to each sensor's real dry and wet readings.
 - **The rain-tank-full alert always says "Auto-draining started"**, even when the clean tank is
   also full and the rain pump stays off. The rain tank needs a physical overflow for that case.
 - **Manual rain pump ignores the tank levels**, so it can run the clean tank over or the rain
   tank dry.
-- **No mains top-up.** The clean-tank pump on GPIO 19 is wired but never switched on, so when
+- **No mains top-up.** There is no pump or valve to refill the clean tank, so when
   there is no rain the clean tank has to be refilled by hand.
 - **The weather model is a rough guide.** Its labels come from rainfall alone, it cannot tell
   day from night, and Rain is only predicted in the three narrow bands in the table above. The
@@ -300,7 +305,7 @@ docs/images/               pictures used in this README
 
 ## Next steps
 
-- URL-encode Telegram messages and move tokens into a separate `secrets.h` that is git-ignored.
+- Move tokens into a separate `secrets.h` that is git-ignored.
 - Calibrate each soil sensor (dry and wet readings) and make the burst and soak times longer.
 - Re-check the soil a minute after watering before deciding there is a leak.
 - Switch the clean tank to mains water when both tanks run low.
